@@ -1,0 +1,544 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Config file to scrape the data from the menu item 	PRODUTOS FORMULADOS -->
+
+
+<config>
+	
+	<empty>
+		<!-- Main Domain -->
+		<var-def name="dominio">http://agrofit.agricultura.gov.br/agrofit_cons</var-def>		
+		
+		<!-- Internal Page Requests vars  -->
+		<var-def name="lista_produtos_formulados">!ap_produto_form_lista_cons</var-def>
+		
+		<!-- First page param for http request -->
+		<var-def name="nextPage">2330</var-def>
+
+		<var-def name="savePath">pathToSaveResults.xml</var-def>
+	
+	</empty>
+	
+	
+	<file action="write" path="${savePath}">
+		<![CDATA[ <produtos-formulados> ]]>
+	</file>
+	
+	<!-- Main loop to iterate over all pages and get the data -->
+	<var-def name="loop_result">
+		<while condition="${nextPage.toString().length() > 0}">
+			
+			<empty>
+			
+				<!-- Requests a page -->
+				<var-def name="request_result">
+					<xpath expression="/html/body/table">
+						<html-to-xml>
+							<http method="post" url="${dominio}/!ap_produto_form_lista_cons">
+								<http-param name="p_id_produto"></http-param>
+								<http-param name="p_nm_marca_comercial"></http-param>
+								<http-param name="p_id_registrante_empresa"></http-param>
+								<http-param name="p_nr_registro"></http-param>
+								<http-param name="p_id_ingrediente_ativo"></http-param>
+								<http-param name="p_nm_comum_portugues"></http-param>
+								<http-param name="p_id_tecnica_aplicacao"></http-param>
+								<http-param name="p_id_classe"></http-param>
+								<http-param name="p_id_classificacao_tox"></http-param>
+								<http-param name="p_id_classificacao_amb"></http-param>
+								<http-param name="p_tipo_aplicacao">C</http-param>
+								<http-param name="p_id_cultura"></http-param>
+								<http-param name="p_id_cultura_inseto"></http-param>
+								<http-param name="p_id_cultura_planta"></http-param>
+								<http-param name="p_id_planta_daninha"></http-param>
+								<http-param name="p_id_cultura_praga"></http-param>
+								<http-param name="p_nm_sort">nm_marca_comercial</http-param>
+								<http-param name="p_cs_orgao"></http-param>
+								<http-param name="p_linha_inicial"><var name="nextPage"/></http-param>			
+							</http>
+						</html-to-xml>
+					</xpath>
+				</var-def>
+				
+				<!-- Gets the next page number for next request -->
+				<var-def name="nextPage">
+					<regexp>
+						<regexp-pattern>[0-9]+</regexp-pattern>
+						<regexp-source>
+							<xpath expression="/table/tbody/tr[2]/td/form/table/tbody/tr[3]/td/table[2]/tbody/tr/td[3]/input/@onclick">
+								<var name="request_result"/>
+							</xpath>
+						</regexp-source>
+					</regexp>
+				</var-def>
+			
+			</empty>
+			
+			<!-- here we get the needed information -->
+			<loop item="item_data">
+				
+				<!-- Gets all links in the current page for plantas daninhas -->
+				<list>
+					<xpath expression="/table/tbody/tr[2]/td/form/table/tbody/tr[3]/td/table/tbody/tr/td[2]/a/@href">
+						<var name="request_result"/>
+					</xpath>	
+				</list>
+				
+				<!-- make a new request for each item(link) in the list and store the data -->
+				<body>
+						
+					<empty>
+						
+						<var-def name="data_to_scrape">
+							<xpath expression="/html/body">
+								<html-to-xml>
+									<http method="get" url="${dominio}/${item_data}"></http>
+								</html-to-xml>
+							</xpath>
+						</var-def>
+					</empty>
+					
+					<empty>
+						<file action="append" path="${savePath}">
+							<![CDATA[ <produto> ]]>	
+							
+								<![CDATA[ <dados-gerais> ]]>
+									
+										
+										<![CDATA[ <nome-comercial> ]]>
+											<xpath expression="//input[@name = 'p_nm_marca_comercial']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </nome-comercial> ]]>
+						
+										<![CDATA[ <nr-registro> ]]>
+											<xpath expression="//input[@name = 'p_nr_registro']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </nr-registro> ]]>
+								
+										<![CDATA[ <titular-registro> ]]>
+											<xpath expression="//a/input[@name = 'p_nm_registrante_empresa']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </titular-registro> ]]>
+								
+										<![CDATA[ <cnpj> ]]>
+											<xpath expression="//input[@name = 'p_nr_cnpj']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </cnpj> ]]>		
+										
+										<![CDATA[ <classe-categoria-agronomica> ]]>	
+																
+											<loop item="loop_item">
+												<list>
+													<regexp>
+														<regexp-pattern>[a-zA-Z\.\sáéíóúÁÉÍÓÚâêôÂÊÔãõÃÕçÇ_\-]+</regexp-pattern>
+														<regexp-source>
+															<regexp>
+																<regexp-pattern>\([^\)]+\)</regexp-pattern>
+																<regexp-source>
+																		<xpath expression="//div[@id = 'N1']/table[2]/tbody/tr/td/div/script/text()">
+																		<var name="data_to_scrape"/>
+																	</xpath>
+																</regexp-source>
+															</regexp>
+														</regexp-source>
+													</regexp>
+												</list>
+												<body>
+													<![CDATA[ <item> ]]>
+														<var name="loop_item"/>
+													<![CDATA[ </item> ]]>	
+												</body>
+											</loop>
+																
+										<![CDATA[ </classe-categoria-agronomica> ]]>
+										
+										
+										<![CDATA[ <classificacao-toxicologia> ]]>
+											<xpath expression="//input[@name = 'p_ds_classificacao_tox']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </classificacao-toxicologia> ]]>
+										
+										<![CDATA[ <classificacao-ambiental> ]]>
+											<xpath expression="//input[@name = 'p_ds_classificacao_amb']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </classificacao-ambiental> ]]>
+										
+										<![CDATA[ <modo-acao> ]]>
+											<xpath expression="//input[@name = 'p_tx_modo_acao']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </modo-acao> ]]>
+										
+										<![CDATA[ <tecnica-aplicacao> ]]>
+											<xpath expression="//input[@name = 'p_ds_tecnica_aplicacao']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </tecnica-aplicacao> ]]>
+										
+										<![CDATA[ <compatibilidade> ]]>
+											<xpath expression="//input[@name = 'p_ds_compatibilidade']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </compatibilidade> ]]>
+										
+										<![CDATA[ <inflamavel> ]]>
+											<xpath expression="//div[@id = 'N1']/table[3]/tbody/tr[4]/td[2]/text()">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </inflamavel> ]]>
+										
+										<![CDATA[ <corrosivo> ]]>
+											<xpath expression="//div[@id = 'N1']/table[3]/tbody/tr[5]/td[2]/text()">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </corrosivo> ]]>
+										
+										<![CDATA[ <embalagem-produto> ]]>
+											<xpath expression="//textarea[@name = 'p_ds_empalagem']/text()">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </embalagem-produto> ]]>
+										
+										<![CDATA[ <observacao> ]]>
+											<xpath expression="//textarea[@name = 'p_tx_observacao']/text()">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </observacao> ]]>
+										
+								<![CDATA[ </dados-gerais> ]]>
+								
+								
+								<![CDATA[ <composicao> ]]>
+									
+									<![CDATA[ <formulacao> ]]>
+										<xpath expression="//input[@name = 'p_ds_formulacao']/@value">
+											<var name="data_to_scrape"/>
+										</xpath>
+									<![CDATA[ </formulacao> ]]>
+										
+									<![CDATA[ <ingredientes-ativo> ]]>	
+										
+										<![CDATA[ <ingrediente-ativo> ]]>
+												
+										<![CDATA[ </ingrediente-ativo> ]]>
+										
+									<![CDATA[ </ingredientes-ativo> ]]>	
+										
+										
+									<![CDATA[ <ingrediente-inerte> ]]>	
+										
+										<![CDATA[ <qtd-inerte> ]]>
+											<xpath expression="//input[@name = 'p_qt_ingrediente_inerte']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </qtd-inerte> ]]>
+										
+										<![CDATA[ <unidade-medida> ]]>
+											<xpath expression="//input[@name = 'p_nm_unidade_medida_inerte']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </unidade-medida> ]]>
+										
+										<![CDATA[ <percentual> ]]>
+											<xpath expression="//input[@name = 'p_nr_percentual_inerte']/@value">
+												<var name="data_to_scrape"/>
+											</xpath>
+										<![CDATA[ </percentual> ]]>
+										
+									<![CDATA[ </ingrediente-inerte> ]]>	
+									
+								<![CDATA[ </composicao> ]]>
+								
+								<![CDATA[ <indicacao-uso> ]]>
+									
+									<loop item="loop_item">
+										
+										<list>
+											<xpath expression="//div[@id='N3']/table/tbody/tr/td/div/table/tbody/tr">
+												<var name="data_to_scrape"/>
+											</xpath>
+										</list>
+										
+										<body>
+											
+											<empty>
+												<var-def name="is_empty">
+													<regexp>
+														<regexp-pattern>
+															![^0-9]+\=[0-9]+
+														</regexp-pattern>
+														<regexp-source>
+															<xpath expression="tr/td[1]/a/@href">
+																<var name="loop_item"/>
+															</xpath>	
+														</regexp-source>
+													</regexp>
+												</var-def>
+											</empty>
+											
+											<case>
+												
+												<if condition="${is_empty.toString().length() != 0}">
+													<![CDATA[ <item> ]]>
+														
+														<![CDATA[ <cultura> ]]>
+															<xpath expression="tr/td[1]/a/text()">
+																<var name="loop_item"/>
+															</xpath>
+														<![CDATA[ </cultura> ]]>
+														
+														<![CDATA[ <praga> ]]>
+														
+															<![CDATA[ <nome-cientifico> ]]>
+																<xpath expression="tr/td[2]/a/text()">
+																	<var name="loop_item"/>
+																</xpath>	
+															<![CDATA[ </nome-cientifico> ]]>
+																
+															<![CDATA[ <nomes-vulgares> ]]>
+																<xpath expression="tr/td[3]/a/text()">
+																	<var name="loop_item"/>
+																</xpath>
+															<![CDATA[ </nomes-vulgares> ]]>
+														
+														
+														<![CDATA[ </praga> ]]>									
+														
+													<![CDATA[ </item> ]]>
+													
+														
+												</if>
+											</case>
+										</body>
+									</loop>
+												
+								<![CDATA[ </indicacao-uso> ]]>
+								
+								<![CDATA[ <documentos> ]]>
+									
+									<![CDATA[ <ministerio-agricultura> ]]>
+									<loop item="loop_item">
+										<list>
+											<xpath expression="//div[@id = 'N8']/table/tbody/tr">
+												<var name="data_to_scrape"/>
+											</xpath>
+										</list>
+										
+										<body>
+											
+											<empty>
+												<var-def name="data">
+													<xpath expression="tr/td[1]/a">
+														<var name="loop_item"/>
+													</xpath>	
+												</var-def>
+											</empty>
+											
+											<case>
+												
+												<if condition="${data.toString().length() != 0}">
+													
+													<![CDATA[ <item> ]]>
+														<![CDATA[ <nome> ]]>
+															<xpath expression="a/text()">
+																<var name="data"/>
+															</xpath>
+														<![CDATA[ </nome> ]]>
+															
+														<empty>
+															<var-def name="link_doc1">
+																<xpath expression="a/@href">
+																	<var name="data"/>
+																</xpath>
+															</var-def>
+														</empty>
+														
+														<![CDATA[ <link> ]]>
+															<template language="javascript">
+																${dominio + '/' + link_doc1}
+															</template>
+															
+														<![CDATA[ </link> ]]>
+													<![CDATA[ </item> ]]>	
+													
+												</if>
+											
+											</case>
+										</body>
+									</loop>			
+									<![CDATA[ </ministerio-agricultura> ]]>
+									
+									<![CDATA[ <anvisa> ]]>
+									<loop item="loop_item">
+										<list>
+											<xpath expression="//div[@id = 'N9']/table/tbody/tr">
+												<var name="data_to_scrape"/>
+											</xpath>
+										</list>
+										
+										<body>
+											
+											<empty>
+												<var-def name="data">
+													<xpath expression="tr/td[1]/a">
+														<var name="loop_item"/>
+													</xpath>	
+												</var-def>
+											</empty>
+											
+											<case>
+												
+												<if condition="${data.toString().length() != 0}">
+													
+													<![CDATA[ <item>]]>		
+														<![CDATA[ <nome> ]]>
+															<xpath expression="a/text()">
+																<var name="data"/>
+															</xpath>
+														<![CDATA[ </nome> ]]>
+														
+														<empty>
+															<var-def name="link_doc2">
+																<xpath expression="a/@href">
+																	<var name="data"/>
+																</xpath>
+															</var-def>
+														</empty>
+														
+														<![CDATA[ <link> ]]>
+															<template language="javascript">
+																${dominio + '/' + link_doc2}
+															</template>
+															
+														<![CDATA[ </link> ]]>
+													<![CDATA[ <item>]]>		
+													
+												</if>
+											
+											</case>
+										</body>
+									</loop>			
+									<![CDATA[ </anvisa> ]]>
+									
+									<![CDATA[ <ibama> ]]>
+									<loop item="loop_item">
+										<list>
+											<xpath expression="//div[@id = 'N10']/table/tbody/tr">
+												<var name="data_to_scrape"/>
+											</xpath>
+										</list>
+										
+										<body>
+											
+											<empty>
+												<var-def name="data">
+													<xpath expression="tr/td[1]/a">
+														<var name="loop_item"/>
+													</xpath>	
+												</var-def>
+											</empty>
+											
+											<case>
+												
+												<if condition="${data.toString().length() != 0}">
+														
+													<![CDATA[ <item>]]>	
+														<![CDATA[ <nome> ]]>
+															<xpath expression="a/text()">
+																<var name="data"/>
+															</xpath>
+														<![CDATA[ </nome> ]]>
+															
+														<empty>
+															<var-def name="link_doc3">
+																<xpath expression="a/@href">
+																	<var name="data"/>
+																</xpath>
+															</var-def>
+														</empty>
+														
+														<![CDATA[ <link> ]]>
+															<template language="javascript">
+																${dominio + '/' + link_doc3}
+															</template>
+															
+														<![CDATA[ </link> ]]>
+													<![CDATA[ </item>]]>
+												</if>
+											
+											</case>
+										</body>
+									</loop>			
+									<![CDATA[ </ibama> ]]>
+									
+									<![CDATA[ <documentos-mapa> ]]>
+										
+										<![CDATA[ <certificado-regsitro> ]]>
+											<empty>
+												<var-def name="link_cert">
+													<xpath expression="//div[@id = 'N7']/table/tbody/tr/td/table[2]/tbody/tr[3]/td[1]/a/@href">
+														<var name="data_to_scrape"/>
+													</xpath>
+												</var-def>
+											</empty>
+											
+											<template language="javascript">
+												${dominio + '/' + link_cert}
+											</template>
+											
+										<![CDATA[ </certificado-regsitro> ]]>
+										
+										<![CDATA[ <rotulo> ]]>
+											<empty>
+												<var-def name="link_rot">
+													<xpath expression="//div[@id = 'N7']/table/tbody/tr/td/table[2]/tbody/tr[4]/td[1]/a/@href">
+														<var name="data_to_scrape"/>
+													</xpath>
+												</var-def>
+											</empty>
+											
+											<template language="javascript">
+												${dominio + '/' + link_rot}
+											</template>
+											
+										<![CDATA[ </rotulo> ]]>
+										
+										<![CDATA[ <bula> ]]>
+											<empty>
+												<var-def name="link_bula">
+													<xpath expression="//div[@id = 'N7']/table/tbody/tr/td/table[2]/tbody/tr[4]/td[1]/a/@href">
+														<var name="data_to_scrape"/>
+													</xpath>
+												</var-def>
+											</empty>
+											
+											<template language="javascript">
+												${dominio + '/' + link_bula}
+											</template>
+											
+										<![CDATA[ </bula> ]]>
+										
+										
+										
+									<![CDATA[ </documentos-mapa> ]]>
+									
+								<![CDATA[ </documentos> ]]>
+								
+								
+							<![CDATA[ </produto> ]]>
+						</file>
+					</empty>
+				</body>		
+			</loop>
+		</while>	
+	</var-def>		
+	<file action="append" path="${savePath}">
+		<![CDATA[ </produtos-formulados> ]]>
+	</file>
+	
+</config>
